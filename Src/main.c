@@ -38,10 +38,12 @@
 #include "usart.h"
 
 /* Private variables ---------------------------------------------------------*/
-#define ZLG_READ_ADDRESS1 0x01
+#define ZLG_READ_ADDRESS1 0x01  /* key value register */
 #define ZLG_READ_ADDRESS2 0x10
 #define ZLG_WRITE_ADDRESS1 0x10
 #define ZLG_WRITE_ADDRESS2 0x11
+#define I2C_WRITE_ADDR 0x70
+#define I2C_READ_ADDR 0x71
 #define BUFFER_SIZE2 sizeof(Rx2_Buffer)
 
 uint8_t flag;      // Key-specific flag value
@@ -56,8 +58,7 @@ void swtich_key(void);
 void switch_flag(void);
 
 /* Main function -------------------------------------------------------------*/
-int main(void)
-{
+int main(void) {
     HAL_Init();
     SystemClock_Config();
     MX_GPIO_Init();
@@ -65,25 +66,26 @@ int main(void)
     MX_USART1_UART_Init();
 
     printf("\n\r");
-    printf("\n\r embeded password lock\n\r");
+    printf("\n\r Embeded Password Lock\n\r");
 
-    while (1)
-    {
-        if (flag1 == 1)
-        {
+    while (1) {
+        if (flag1 == 1){
             flag1 = 0;
-            I2C_ZLG7290_Read(&hi2c1, 0x71, ZLG_READ_ADDRESS1, Rx1_Buffer, 1); // Read key value
+            /* read key value from key value register into R1_Buffer through i2c */
+            I2C_ZLG7290_Read(&hi2c1, I2C_READ_ADDR, ZLG_READ_ADDRESS1, Rx1_Buffer, 1);
             printf("\n\r key value = %x\n\r", Rx1_Buffer[0]);
-            swtich_key();                                                     // Process key value and set flag
-            I2C_ZLG7290_Read(&hi2c1, 0x71, ZLG_READ_ADDRESS2, Rx2_Buffer, 8); // Read 8-digit display
-            switch_flag();                                                    // Update display based on flag
+            /* process key value and set flag */
+            swtich_key();
+            /* read 8-digit display into Rx2_Buffer through i2c */
+            I2C_ZLG7290_Read(&hi2c1, I2C_READ_ADDR, ZLG_READ_ADDRESS2, Rx2_Buffer, 8);
+            /* update display based on flag */
+            switch_flag();
         }
     }
 }
 
 /* System Clock Configuration ------------------------------------------------*/
-void SystemClock_Config(void)
-{
+void SystemClock_Config(void) {
     RCC_OscInitTypeDef RCC_OscInitStruct;
     RCC_ClkInitTypeDef RCC_ClkInitStruct;
 
@@ -113,137 +115,72 @@ void SystemClock_Config(void)
 }
 
 /* User functions ------------------------------------------------------------*/
-void swtich_key(void)
-{
-    switch (Rx1_Buffer[0])
-    {
-    case 0x1C:
-        flag = 1;
-        break;
-    case 0x1B:
-        flag = 2;
-        break;
-    case 0x1A:
-        flag = 3;
-        break;
-    case 0x14:
-        flag = 4;
-        break;
-    case 0x13:
-        flag = 5;
-        break;
-    case 0x12:
-        flag = 6;
-        break;
-    case 0x0C:
-        flag = 7;
-        break;
-    case 0x0B:
-        flag = 8;
-        break;
-    case 0x0A:
-        flag = 9;
-        break;
-    case 0x03:
-        flag = 15;
-        break;
-    case 0x19:
-        flag = 10;
-        break;
-    case 0x11:
-        flag = 11;
-        break;
-    case 0x09:
-        flag = 12;
-        break;
-    case 0x01:
-        flag = 13;
-        break;
-    case 0x02:
-        flag = 14;
-        break;
-    case 0x04:
-    default:
-        break;
+void swtich_key(void) {
+    switch (Rx1_Buffer[0]) {
+        case 0x03: flag = 0; break;    /* 0 */
+        case 0x1C: flag = 1; break;     /* 1 */
+        case 0x1B: flag = 2; break;     /* 2 */
+        case 0x1A: flag = 3; break;     /* 3 */
+        case 0x14: flag = 4; break;     /* 4 */
+        case 0x13: flag = 5; break;     /* 5 */
+        case 0x12: flag = 6; break;     /* 6 */
+        case 0x0C: flag = 7; break;     /* 7 */
+        case 0x0B: flag = 8; break;     /* 8 */
+        case 0x0A: flag = 9; break;     /* 9 */
+        case 0x19: flag = 10; break;    /* A */
+        case 0x11: flag = 11; break;    /* B */
+        case 0x09: flag = 12; break;    /* C */
+        case 0x01: flag = 13; break;    /* D */
+        case 0x02: flag = 14; break;    /* # */
+        case 0x04:                      /* * */
+        default:
+            break;
     }
 }
 
-void switch_flag(void)
-{
+void switch_flag(void) {
     uint8_t value;
-    switch (flag)
-    {
-    case 1:
-        value = 0x0C;
-        break;
-    case 2:
-        value = 0xDA;
-        break;
-    case 3:
-        value = 0xF2;
-        break;
-    case 4:
-        value = 0x66;
-        break;
-    case 5:
-        value = 0xB6;
-        break;
-    case 6:
-        value = 0xBE;
-        break;
-    case 7:
-        value = 0xE0;
-        break;
-    case 8:
-        value = 0xFE;
-        break;
-    case 9:
-        value = 0xE6;
-        break;
-    case 10:
-        value = 0xEE;
-        break;
-    case 11:
-        value = 0x3E;
-        break;
-    case 12:
-        value = 0x9C;
-        break;
-    case 13:
-        value = 0x7A;
-        break;
-    case 14:
-        Tx1_Buffer[0] = 0x00;
-        I2C_ZLG7290_Write(&hi2c1, 0x70, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 8);
-        return;
-    case 15:
-        value = 0xFC;
-        break;
-    default:
-        return;
+    switch (flag) {
+        case 0: value = 0xFC; break;
+        case 1: value = 0x0C; break;
+        case 2: value = 0xDA; break;
+        case 3: value = 0xF2; break;
+        case 4: value = 0x66; break;
+        case 5: value = 0xB6; break;
+        case 6: value = 0xBE; break;
+        case 7: value = 0xE0; break;
+        case 8: value = 0xFE; break;
+        case 9: value = 0xE6; break;
+        case 10: value = 0xEE; break;   /* A */
+        case 11: value = 0x3E; break;   /* B */
+        case 12: value = 0x9C; break;   /* C */
+        case 13: value = 0x7A; break;   /* D */
+        case 14:                        /* # */
+            Tx1_Buffer[0] = 0x00;
+            I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 8);
+            return;
+        case 15:
+        default: return;
     }
+
     Tx1_Buffer[0] = value;
-    if (Rx2_Buffer[0] == 0)
-    {
-        I2C_ZLG7290_Write(&hi2c1, 0x70, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
-    }
-    else
-    {
-        I2C_ZLG7290_Write(&hi2c1, 0x70, ZLG_WRITE_ADDRESS2, Rx2_Buffer, BUFFER_SIZE2);
-        I2C_ZLG7290_Write(&hi2c1, 0x70, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
+
+    if (Rx2_Buffer[0] == 0) {
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
+    } else {
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS2, Rx2_Buffer, BUFFER_SIZE2);
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
     }
 }
 
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
     flag1 = 1;
 }
 
-int fputc(int ch, FILE *f)
-{ 
-  uint8_t tmp[1]={0};
+int fputc(int ch, FILE *f) {
+    uint8_t tmp[1]={0};
     tmp[0] = (uint8_t)ch;
-    HAL_UART_Transmit(&huart1,tmp,1,10);    
+    HAL_UART_Transmit(&huart1,tmp,1,10);
     return ch;
 }
 
