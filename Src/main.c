@@ -40,15 +40,16 @@
 /* Private variables ---------------------------------------------------------*/
 #define ZLG_READ_ADDRESS1 0x01  /* key value register */
 #define ZLG_READ_ADDRESS2 0x10
-#define ZLG_WRITE_ADDRESS1 0x10
-#define ZLG_WRITE_ADDRESS2 0x11
+#define DISPLAY_CMD_ADDR 0x10   /* control the reset of 8-digit display */
+#define DISPLAY_DATA_ADDR 0x11  /* control the value update of 8-digit display */
 #define I2C_WRITE_ADDR 0x70
 #define I2C_READ_ADDR 0x71
-#define BUFFER_SIZE2 sizeof(Rx2_Buffer)
+#define BUFFER_SIZE2 sizeof(input_buf)
 
 uint8_t flag;      // Key-specific flag value
 uint8_t flag1 = 0; // Interrupt flag
-uint8_t Rx2_Buffer[8] = {0};
+uint8_t input_buf[8] = {0};
+uint8_t input_cnt = 0;
 uint8_t Tx1_Buffer[8] = {0};
 uint8_t Rx1_Buffer[1] = {0};
 
@@ -76,8 +77,9 @@ int main(void) {
             printf("\n\r key value = %x\n\r", Rx1_Buffer[0]);
             /* process key value and set flag */
             swtich_key();
-            /* read 8-digit display into Rx2_Buffer through i2c */
-            I2C_ZLG7290_Read(&hi2c1, I2C_READ_ADDR, ZLG_READ_ADDRESS2, Rx2_Buffer, 8);
+            /* read 8-digit display into input_buf through i2c */
+            I2C_ZLG7290_Read(&hi2c1, I2C_READ_ADDR, ZLG_READ_ADDRESS2, input_buf, 8);
+            printf("\n\r display value = %x %x %x %x %x %x %x %x\n\r", input_buf[0], input_buf[1], input_buf[2], input_buf[3], input_buf[4], input_buf[5], input_buf[6], input_buf[7]);
             /* update display based on flag */
             switch_flag();
         }
@@ -136,6 +138,7 @@ void swtich_key(void) {
         default:
             break;
     }
+    input_buf[input_cnt++] = flag;
 }
 
 void switch_flag(void) {
@@ -157,19 +160,22 @@ void switch_flag(void) {
         case 13: value = 0x7A; break;   /* D */
         case 14:                        /* # */
             Tx1_Buffer[0] = 0x00;
-            I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 8);
+            I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, DISPLAY_CMD_ADDR, Tx1_Buffer, 8);
             return;
-        case 15:
+        case 15:                        /* * */
         default: return;
     }
 
-    Tx1_Buffer[0] = value;
+    Tx1_Buffer[0] = 0x02;
 
-    if (Rx2_Buffer[0] == 0) {
-        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
+    /* write into the 8-digit display */
+    if (input_buf[0] == 0) {
+        /* clear the display */
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, DISPLAY_CMD_ADDR, Tx1_Buffer, 1);
     } else {
-        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS2, Rx2_Buffer, BUFFER_SIZE2);
-        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, ZLG_WRITE_ADDRESS1, Tx1_Buffer, 1);
+        /* update the display */
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, DISPLAY_DATA_ADDR, input_buf, BUFFER_SIZE2); /* keep the old data */
+        I2C_ZLG7290_Write(&hi2c1, I2C_WRITE_ADDR, DISPLAY_CMD_ADDR, Tx1_Buffer, 1); /* write the new digit */
     }
 }
 
